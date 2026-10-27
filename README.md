@@ -49,7 +49,7 @@ godot --headless --path . --script res://tests/smoke_test.gd
 4. Download the artifact named `lordre-cache-android-apk-<run number>` to get `LOrdreCache-debug.apk` and Android export logs. Download `lordre-cache-validation-<run number>` for import logs, smoke test logs and a source archive.
 5. On Android, allow installs from the browser/file app you use, then install the debug APK.
 
-The workflow uses Godot export templates, the Android SDK and Java 17. It does **not** require Unity, Unity activation, any paid plugin, or a game service. The debug APK is for sideload testing, not Google Play release signing.
+The workflow uses Godot export templates, the Android SDK and Java 17. The project explicitly enables ETC2/ASTC texture import because Godot Android export can otherwise fail on headless Linux with a blank “configuration errors” message. CI clears the generated `.godot` cache before reimporting source assets, and the Android preset uses PNG launcher-icon fields supported by Godot 4.4.1. It does **not** require Unity, Unity activation, any paid plugin, or a game service. The debug APK is for sideload testing, not Google Play release signing.
 
 ## Important limitations / next milestones
 
