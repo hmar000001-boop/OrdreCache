@@ -43,9 +43,18 @@ jobs:
 
       - name: Run gameplay smoke tests
         shell: bash
+        timeout-minutes: 3
         run: |
-          set -o pipefail
-          godot --headless --path . --script res://tests/smoke_test.gd 2>&1 | tee build/smoke-test.log
+          mkdir -p build
+          set +e
+          timeout --signal=TERM --kill-after=10s 120s godot --headless --path . --script res://tests/smoke_test.gd > build/smoke-test.log 2>&1
+          result=$?
+          cat build/smoke-test.log
+          if [ "$result" -eq 124 ] || [ "$result" -eq 137 ]; then
+            echo "ERROR: smoke test exceeded 120 seconds; inspect the last log output above." | tee -a build/smoke-test.log
+            exit 124
+          fi
+          exit "$result"
 
       - name: Package source and validation reports
         if: always()

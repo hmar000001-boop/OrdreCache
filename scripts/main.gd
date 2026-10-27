@@ -285,7 +285,7 @@ func _build_game(parent: VBoxContainer) -> void:
 	symbols.add_theme_constant_override("v_separation", 8)
 	parent.add_child(symbols)
 	for symbol in SYMBOLS:
-		var chosen := selected_symbol == symbol
+		var chosen: bool = (selected_symbol == symbol)
 		var btn := _make_button(_symbol_icon(symbol) + "  " + _t(symbol), func(): _select_symbol(symbol), chosen)
 		btn.custom_minimum_size.y = 48
 		symbols.add_child(btn)
