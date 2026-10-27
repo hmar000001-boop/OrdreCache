@@ -1,0 +1,108 @@
+name: L'Ordre Caché — build Android from ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'LOrdreCache_Godot_Project_and_CI.zip'
+      - '.github/workflows/build-from-zip.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ordre-cache-zip-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Validate game and export Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract game project ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s LOrdreCache_Godot_Project_and_CI.zip || { echo 'Missing LOrdreCache_Godot_Project_and_CI.zip in repository root.'; exit 1; }
+          mkdir -p _source build/reports
+          unzip -q LOrdreCache_Godot_Project_and_CI.zip -d _source
+          test -f _source/project.godot
+          test -f _source/scripts/main.gd
+          test -f _source/export_presets.cfg
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform components
+        shell: bash
+        run: sdkmanager 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: Set up Godot 4.4.1 and export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1
+          use-dotnet: false
+          include-templates: true
+
+      - name: Configure Godot Android paths and debug signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.config/godot" "$HOME/.android" "_source/build/android"
+          cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF_SETTINGS
+          [gd_resource type="EditorSettings" format=3]
+          [resource]
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          EOF_SETTINGS
+          if [ ! -s "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname 'CN=Android Debug,O=Android,C=US'
+          fi
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
+          echo 'GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey' >> "$GITHUB_ENV"
+          echo 'GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android' >> "$GITHUB_ENV"
+
+      - name: Import and validate Godot project
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --editor --path _source --quit 2>&1 | tee build/reports/godot-import.log
+
+      - name: Run gameplay smoke tests
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path _source --script res://tests/smoke_test.gd 2>&1 | tee build/reports/gameplay-smoke-test.log
+
+      - name: Export Android debug APK
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path _source --export-debug 'Android' _source/build/android/LOrdreCache-debug.apk 2>&1 | tee build/reports/android-export.log
+          test -s _source/build/android/LOrdreCache-debug.apk
+          sha256sum _source/build/android/LOrdreCache-debug.apk | tee build/reports/apk-sha256.txt
+
+      - name: Upload APK, logs, source archive and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LOrdreCache-build-${{ github.run_number }}
+          path: |
+            _source/build/android/LOrdreCache-debug.apk
+            build/reports/**
+          if-no-files-found: warn
+          retention-days: 30

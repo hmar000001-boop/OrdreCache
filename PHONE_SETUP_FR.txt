@@ -1,0 +1,16 @@
+MISE EN ROUTE DEPUIS UN TÉLÉPHONE
+
+Option A — dépôt GitHub avec les fichiers extraits
+1. Crée un dépôt GitHub vide.
+2. Extrait le ZIP sur le téléphone ou dans un outil de fichiers qui gère les archives.
+3. Téléverse le contenu du dossier du projet en conservant les dossiers, notamment .github/workflows.
+4. Vérifie Actions : le workflow « Build L'Ordre Caché » se lancera lors du push sur main.
+
+Option B — garder le projet en un ZIP dans le dépôt (moins de fichiers à téléverser)
+1. Crée un dépôt GitHub vide et téléverse LOrdreCache_Godot_Project_and_CI.zip à la racine.
+2. Dans GitHub, choisis Add file > Create new file.
+3. Pour le chemin, saisis .github/workflows/build-from-zip.yml.
+4. Copie le contenu du fichier compagnon LOrdreCache_GitHub_Build_From_Zip.yml, puis valide le commit sur main.
+5. Ouvre Actions et télécharge l'artefact LOrdreCache-build-<numéro> lorsque le workflow se termine.
+
+L'APK de débogage est destiné à une installation manuelle. Ce n'est pas une version signée pour Google Play. Le workflow n'a pas encore été exécuté dans ton compte GitHub : en cas d'échec, télécharge les journaux/rapports dans l'artefact et partage leur contenu pour corriger l'erreur exacte.
