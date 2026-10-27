@@ -265,7 +265,7 @@ func _refresh_game_ui() -> void:
 	if screen != "game" or not is_instance_valid(game_status_label):
 		return
 	var puzzle: Dictionary = Catalog.PUZZLES[puzzle_index]
-	var solved := status_kind == "solved" or (engine.state == str(puzzle["goal"]) and completed)
+	var solved: bool = status_kind == "solved" or (str(engine.state) == str(puzzle["goal"]) and completed)
 	game_progress_label.text = "%02d / %02d" % [puzzle_index + 1, Catalog.PUZZLES.size()]
 	game_laws_label.text = "✦ %d / %d" % [engine.discovered.size(), Catalog.KNOWN_LAWS.size()]
 	game_object_label.text = _t("object") + " · " + _t(engine.state)
