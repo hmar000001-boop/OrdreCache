@@ -1,12 +1,11 @@
-name: L'Ordre Caché — build Android from ZIP
+name: L'Ordre Caché 3D — build Android from ZIP
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - 'LOrdreCache_Godot_Project_and_CI.zip'
-      - '.github/workflows/build-from-zip.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,24 +15,84 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Validate game and export Android APK
+  validate:
+    name: Extract, validate and test the uploaded project ZIP
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 12
     steps:
-      - name: Checkout repository
+      - name: Checkout repository containing the project ZIP
         uses: actions/checkout@v4
 
-      - name: Extract game project ZIP
+      - name: Confirm the project archive exists
+        run: test -s LOrdreCache_3D_Refonte_ANDROID_CI.zip
+
+      - name: Extract project archive
+        run: |
+          mkdir -p project
+          unzip -q LOrdreCache_3D_Refonte_ANDROID_CI.zip -d project
+          test -s project/project.godot
+
+      - name: Set up Godot 4.4.1
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1
+          use-dotnet: false
+          include-templates: false
+
+      - name: Import and parse project
         shell: bash
         run: |
-          set -euo pipefail
-          test -s LOrdreCache_Godot_Project_and_CI.zip || { echo 'Missing LOrdreCache_Godot_Project_and_CI.zip in repository root.'; exit 1; }
-          mkdir -p _source build/reports
-          unzip -q LOrdreCache_Godot_Project_and_CI.zip -d _source
-          test -f _source/project.godot
-          test -f _source/scripts/main.gd
-          test -f _source/export_presets.cfg
+          set -o pipefail
+          mkdir -p project/build/reports
+          godot --headless --editor --path project --quit 2>&1 | tee project/build/import.log
+
+      - name: Run regression tests
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=10s 180s godot --headless --path project --script res://tests/smoke_test.gd 2>&1 | tee project/build/smoke-test.log
+          grep -F 'SMOKE_TEST_OK:' project/build/smoke-test.log
+
+      - name: Package source and diagnostic logs
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p project/build/reports
+          cp project/build/import.log project/build/reports/import.log 2>/dev/null || true
+          cp project/build/smoke-test.log project/build/reports/smoke-test.log 2>/dev/null || true
+          if [ -d project ]; then
+            tar --exclude='./.godot' --exclude='./build' -czf project/build/lordre-cache-source.tar.gz -C project .
+          fi
+
+      - name: Upload validation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lordre-cache-zip-validation-${{ github.run_number }}
+          path: |
+            project/build/import.log
+            project/build/smoke-test.log
+            project/build/reports/**
+            project/build/lordre-cache-source.tar.gz
+          if-no-files-found: warn
+          retention-days: 14
+
+  android-apk:
+    name: Export the Android debug APK from the uploaded ZIP
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository containing the project ZIP
+        uses: actions/checkout@v4
+
+      - name: Confirm and extract project archive
+        run: |
+          test -s LOrdreCache_3D_Refonte_ANDROID_CI.zip
+          mkdir -p project
+          unzip -q LOrdreCache_3D_Refonte_ANDROID_CI.zip -d project
+          test -s project/project.godot
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -47,10 +106,9 @@ jobs:
           packages: 'platform-tools'
 
       - name: Install Android platform components
-        shell: bash
-        run: sdkmanager 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Set up Godot 4.4.1 and export templates
+      - name: Set up Godot 4.4.1 and Android templates
         uses: chickensoft-games/setup-godot@v2
         with:
           version: 4.4.1
@@ -61,7 +119,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.config/godot" "$HOME/.android" "_source/build/android"
+          mkdir -p "$HOME/.config/godot" "$HOME/.android"
           cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF_SETTINGS
           [gd_resource type="EditorSettings" format=3]
           [resource]
@@ -78,35 +136,26 @@ jobs:
           echo 'GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey' >> "$GITHUB_ENV"
           echo 'GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android' >> "$GITHUB_ENV"
 
-      - name: Import Android-compatible textures and validate Godot project
+      - name: Import assets and export debug APK
         shell: bash
         run: |
           set -euo pipefail
-          grep -F 'textures/vram_compression/import_etc2_astc=true' _source/project.godot
-          rm -rf _source/.godot
-          godot --headless --editor --path _source --quit 2>&1 | tee build/reports/godot-import.log
+          mkdir -p project/build/android project/build/reports
+          rm -rf project/.godot
+          godot --headless --editor --path project --quit 2>&1 | tee project/build/reports/android-import.log
+          godot --headless --path project --export-debug "Android" project/build/android/LOrdreCache-3D-debug.apk 2>&1 | tee project/build/reports/android-export.log
+          test -s project/build/android/LOrdreCache-3D-debug.apk
+          sha256sum project/build/android/LOrdreCache-3D-debug.apk | tee project/build/reports/apk-sha256.txt
 
-      - name: Run gameplay smoke tests
-        shell: bash
-        run: |
-          set -o pipefail
-          godot --headless --path _source --script res://tests/smoke_test.gd 2>&1 | tee build/reports/gameplay-smoke-test.log
-
-      - name: Export Android debug APK
-        shell: bash
-        run: |
-          set -o pipefail
-          godot --headless --path _source --export-debug 'Android' _source/build/android/LOrdreCache-debug.apk 2>&1 | tee build/reports/android-export.log
-          test -s _source/build/android/LOrdreCache-debug.apk
-          sha256sum _source/build/android/LOrdreCache-debug.apk | tee build/reports/apk-sha256.txt
-
-      - name: Upload APK, logs, source archive and test reports
+      - name: Upload APK and Android logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: LOrdreCache-build-${{ github.run_number }}
+          name: lordre-cache-zip-android-apk-${{ github.run_number }}
           path: |
-            _source/build/android/LOrdreCache-debug.apk
-            build/reports/**
+            project/build/android/LOrdreCache-3D-debug.apk
+            project/build/reports/android-import.log
+            project/build/reports/android-export.log
+            project/build/reports/apk-sha256.txt
           if-no-files-found: warn
           retention-days: 30

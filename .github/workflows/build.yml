@@ -1,4 +1,4 @@
-name: Build L'Ordre Caché
+name: Build L'Ordre Caché 3D Android
 
 on:
   push:
@@ -16,55 +16,52 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate Godot project and gameplay rules
+    name: Validate scripts, 3D scene and puzzle rules
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Godot
+      - name: Set up Godot 4.4.1
         uses: chickensoft-games/setup-godot@v2
         with:
           version: 4.4.1
           use-dotnet: false
           include-templates: false
 
-      - name: Record tool versions
+      - name: Record build metadata
         run: |
           mkdir -p build/reports
           godot --version | tee build/reports/godot-version.txt
           git rev-parse HEAD | tee build/reports/git-commit.txt
+          date -u +'%Y-%m-%dT%H:%M:%SZ' | tee build/reports/build-time-utc.txt
 
-      - name: Import and validate project scripts
+      - name: Import and parse all referenced resources
         shell: bash
         run: |
           set -o pipefail
           godot --headless --editor --path . --quit 2>&1 | tee build/import.log
 
-      - name: Run gameplay smoke tests
+      - name: Run regression tests
         shell: bash
-        timeout-minutes: 3
+        timeout-minutes: 4
         run: |
+          set -o pipefail
           mkdir -p build
-          set +e
-          timeout --signal=TERM --kill-after=10s 120s godot --headless --path . --script res://tests/smoke_test.gd > build/smoke-test.log 2>&1
-          result=$?
-          cat build/smoke-test.log
-          if [ "$result" -eq 124 ] || [ "$result" -eq 137 ]; then
-            echo "ERROR: smoke test exceeded 120 seconds; inspect the last log output above." | tee -a build/smoke-test.log
-            exit 124
-          fi
-          exit "$result"
+          timeout --signal=TERM --kill-after=10s 180s godot --headless --path . --script res://tests/smoke_test.gd 2>&1 | tee build/smoke-test.log
+          grep -F 'SMOKE_TEST_OK:' build/smoke-test.log
 
-      - name: Package source and validation reports
+      - name: Package source snapshot and validation reports
         if: always()
+        shell: bash
         run: |
           mkdir -p build/reports
           cp build/import.log build/reports/import.log 2>/dev/null || true
           cp build/smoke-test.log build/reports/smoke-test.log 2>/dev/null || true
           tar --exclude='./.git' --exclude='./.godot' --exclude='./build' -czf build/lordre-cache-source.tar.gz .
 
-      - name: Upload validation logs and source archive
+      - name: Upload validation logs, reports and source snapshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -78,9 +75,10 @@ jobs:
           retention-days: 14
 
   android-apk:
-    name: Export Android APK
+    name: Export Android debug APK
     runs-on: ubuntu-latest
     needs: validate
+    timeout-minutes: 25
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -99,14 +97,14 @@ jobs:
       - name: Install Android platform components
         run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Set up Godot and Android export templates
+      - name: Set up Godot 4.4.1 and Android export templates
         uses: chickensoft-games/setup-godot@v2
         with:
           version: 4.4.1
           use-dotnet: false
           include-templates: true
 
-      - name: Configure Godot Android paths and debug signing
+      - name: Configure Android paths and debug signing
         shell: bash
         run: |
           set -euo pipefail
@@ -127,27 +125,25 @@ jobs:
           echo 'GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey' >> "$GITHUB_ENV"
           echo 'GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android' >> "$GITHUB_ENV"
 
-      - name: Create Android output folder
-        run: mkdir -p build/android build/reports
-
-      - name: Import Android-compatible textures and export debug APK
+      - name: Import textures and export debug APK
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p build/android build/reports
           grep -F 'textures/vram_compression/import_etc2_astc=true' project.godot
           rm -rf .godot
           godot --headless --editor --path . --quit 2>&1 | tee build/reports/android-import.log
-          godot --headless --path . --export-debug "Android" build/android/LOrdreCache-debug.apk 2>&1 | tee build/reports/android-export.log
-          test -s build/android/LOrdreCache-debug.apk
-          sha256sum build/android/LOrdreCache-debug.apk | tee build/reports/apk-sha256.txt
+          godot --headless --path . --export-debug "Android" build/android/LOrdreCache-3D-debug.apk 2>&1 | tee build/reports/android-export.log
+          test -s build/android/LOrdreCache-3D-debug.apk
+          sha256sum build/android/LOrdreCache-3D-debug.apk | tee build/reports/apk-sha256.txt
 
-      - name: Upload APK and Android build logs
+      - name: Upload APK and Android logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lordre-cache-android-apk-${{ github.run_number }}
+          name: lordre-cache-3d-android-apk-${{ github.run_number }}
           path: |
-            build/android/LOrdreCache-debug.apk
+            build/android/LOrdreCache-3D-debug.apk
             build/reports/android-import.log
             build/reports/android-export.log
             build/reports/apk-sha256.txt

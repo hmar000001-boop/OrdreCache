@@ -1,470 +1,568 @@
-extends Control
+extends Node3D
 
-const SAVE_PATH := "user://ordre_cache_save.cfg"
-const SYMBOLS := ["sun", "rain", "moon", "wind"]
-const GODOT_VERSION := "4.4.1"
+## Scene coordinator. World, rules, save handling and localization are separated from HUD/session flow.
+const Catalog = preload("res://scripts/puzzle_catalog.gd")
+const PuzzleEngineScript = preload("res://scripts/puzzle_engine.gd")
+const GardenWorldScript = preload("res://scripts/garden_world.gd")
+const Localization = preload("res://scripts/localization.gd")
+const SaveServiceScript = preload("res://scripts/save_service.gd")
+const SOUND_SELECT = preload("res://assets/audio/symbol_select.wav")
+const SOUND_DISCOVERY = preload("res://assets/audio/law_discovery.wav")
+const SOUND_NO_CHANGE = preload("res://assets/audio/no_change.wav")
 
-const TEXT := {
-	"fr": {
-		"subtitle": "LE MONDE N'EXPLIQUE RIEN. IL RÉPOND.", "start": "ENTRER DANS LE JARDIN", "continue": "CONTINUER L'EXPLORATION", "trial": "OBSERVER", "reset": "Recommencer l'essai", "journal": "CARNET DES LOIS", "hint": "Indice discret", "back": "Retour", "language": "Langue", "level": "ÉPREUVE", "progress": "LOIS OBSERVÉES", "experiment": "Choisis un signe, puis observe sa réaction.", "locked": "La suite attend tes découvertes.", "home_intro": "Un lieu oublié. Des symboles muets. Des lois que personne ne t'expliquera.", "home_cta": "Chaque essai est une question. Chaque réaction est un indice.", "result": "La matière a changé.", "no_change": "Le signe répond, mais rien ne change. Cette absence est aussi une observation.", "sun": "SOLEIL", "rain": "PLUIE", "moon": "LUNE", "wind": "VENT", "seed": "graine", "sprout": "pousse", "sapling": "jeune plante", "bloom": "fleur ouverte", "carried": "graine emportée", "bud": "bouton fermé", "stone_cold": "pierre froide", "stone_warm": "pierre tiède", "stone_marked": "pierre marquée", "stone_open": "pierre entrouverte", "rule_sun": "La chaleur du soleil réveille la graine.", "rule_rain": "La pluie fait grandir la pousse.", "rule_moon": "La lune ouvre ce qui a grandi.", "rule_wind": "Le vent déplace ce qui est léger.", "rule_stone_sun": "Le soleil réchauffe la pierre froide.", "rule_stone_moon": "La lumière lunaire révèle une marque cachée.", "rule_stone_wind": "Le vent écarte les bords de la pierre marquée.", "p1_title": "La graine silencieuse", "p1_desc": "Une graine repose dans la poussière. Rien ne semble attendre, pourtant elle n'est pas morte.", "p2_title": "La terre assoiffée", "p2_desc": "Une pousse tremble au bord d'un sol sec. Elle a déjà changé une fois. Que lui manque-t-il ?", "p3_title": "La première floraison", "p3_desc": "La plante a grandi, mais son bouton reste fermé. La lumière du jour n'est plus là.", "p4_title": "Le saut du pollen", "p4_desc": "Une graine est isolée sur une dalle. La marque gravée au sol ressemble à un courant d'air.", "p5_title": "La pierre qui rêve", "p5_desc": "Une pierre obstrue le passage. Trois signes gravés autour d'elle semblent former une phrase.", "p6_title": "L'ordre caché", "p6_desc": "Une dernière graine. Aucun indice nouveau. Ce que tu sais déjà suffit peut-être.", "success": "LOI CONFIRMÉE", "next": "Continuer", "finish_title": "Le jardin se souvient", "finish_desc": "Tu n'as pas reçu les lois. Tu les as reconstruites. Au-delà des murs, d'autres lieux attendent des esprits curieux.", "restart": "Rejouer le jardin", "observed": "observée", "notebook_empty": "Aucune loi consignée pour l'instant. Essaie, observe, recommence.", "hint1": "Regarde la nature de l'objet et le symbole qui pourrait l'influencer.", "hint2": "Une loi déjà observée peut s'appliquer à un nouvel objet.", "hint3": "L'ordre compte : un état peut être la conséquence d'un essai précédent.", "notice": "Pas de pénalité. Le monde ne juge pas tes essais.", "menu": "JARDIN IMMOBILE", "chapter": "CHAPITRE I · JARDIN IMMOBILE"
-	},
-	"en": {
-		"subtitle": "THE WORLD DOESN'T EXPLAIN. IT RESPONDS.", "start": "ENTER THE GARDEN", "continue": "CONTINUE EXPLORING", "trial": "OBSERVE", "reset": "Reset experiment", "journal": "NOTEBOOK OF LAWS", "hint": "A subtle hint", "back": "Back", "language": "Language", "level": "TRIAL", "progress": "OBSERVED LAWS", "experiment": "Choose a sign, then observe its reaction.", "locked": "The path ahead waits for your discoveries.", "home_intro": "A forgotten place. Silent symbols. Laws no one will explain.", "home_cta": "Every trial is a question. Every reaction is a clue.", "result": "The matter has changed.", "no_change": "The sign responds, but nothing changes. That absence is also an observation.", "sun": "SUN", "rain": "RAIN", "moon": "MOON", "wind": "WIND", "seed": "seed", "sprout": "sprout", "sapling": "young plant", "bloom": "open flower", "carried": "carried seed", "bud": "closed bud", "stone_cold": "cold stone", "stone_warm": "warm stone", "stone_marked": "marked stone", "stone_open": "open stone", "rule_sun": "Sunlight wakes the seed.", "rule_rain": "Rain makes the sprout grow.", "rule_moon": "Moonlight opens what has grown.", "rule_wind": "Wind moves what is light.", "rule_stone_sun": "Sunlight warms the cold stone.", "rule_stone_moon": "Moonlight reveals a hidden mark.", "rule_stone_wind": "Wind parts the edges of the marked stone.", "p1_title": "The Silent Seed", "p1_desc": "A seed rests in the dust. Nothing seems to be waiting, yet it is not dead.", "p2_title": "Thirsty Ground", "p2_desc": "A sprout trembles beside dry soil. It has changed once already. What does it need?", "p3_title": "The First Bloom", "p3_desc": "The plant has grown, but its bud remains closed. Daylight is gone.", "p4_title": "The Pollen Leap", "p4_desc": "A seed lies isolated on a slab. The mark on the floor resembles a current of air.", "p5_title": "The Dreaming Stone", "p5_desc": "A stone blocks the passage. Three signs carved around it seem to form a sentence.", "p6_title": "The Hidden Order", "p6_desc": "One final seed. No new clue. What you already know may be enough.", "success": "LAW CONFIRMED", "next": "Continue", "finish_title": "The Garden Remembers", "finish_desc": "You were not given the laws. You rebuilt them. Beyond these walls, other places await curious minds.", "restart": "Replay the garden", "observed": "observed", "notebook_empty": "No laws recorded yet. Experiment, observe, and try again.", "hint1": "Consider the object and the sign that might influence it.", "hint2": "A law you observed may apply to a different object.", "hint3": "Order matters: one state can be the result of an earlier experiment.", "notice": "There is no penalty. The world does not judge your experiments.", "menu": "STILL GARDEN", "chapter": "CHAPTER I · STILL GARDEN"
-	},
-	"ar": {
-		"subtitle": "العالم لا يشرح. بل يستجيب.", "start": "ادخل الحديقة", "continue": "تابع الاستكشاف", "trial": "راقب", "reset": "أعد التجربة", "journal": "دفتر القوانين", "hint": "تلميح خفي", "back": "عودة", "language": "اللغة", "level": "التجربة", "progress": "القوانين المكتشفة", "experiment": "اختر رمزاً ثم راقب استجابته.", "home_intro": "مكان منسي. رموز صامتة. وقوانين لن يشرحها لك أحد.", "home_cta": "كل تجربة سؤال، وكل استجابة دليل.", "result": "لقد تغيرت المادة.", "no_change": "استجاب الرمز، لكن شيئاً لم يتغير. حتى غياب التغيير ملاحظة.", "sun": "الشمس", "rain": "المطر", "moon": "القمر", "wind": "الريح", "seed": "بذرة", "sprout": "برعم", "sapling": "نبتة صغيرة", "bloom": "زهرة متفتحة", "carried": "بذرة محمولة", "bud": "برعم مغلق", "stone_cold": "حجر بارد", "stone_warm": "حجر دافئ", "stone_marked": "حجر معلّم", "stone_open": "حجر مفتوح", "rule_sun": "توقظ حرارة الشمس البذرة.", "rule_rain": "يساعد المطر النبتة على النمو.", "rule_moon": "يفتح ضوء القمر ما نما.", "rule_wind": "تحرك الريح الأشياء الخفيفة.", "rule_stone_sun": "تدفئ الشمس الحجر البارد.", "rule_stone_moon": "يكشف ضوء القمر علامة مخفية.", "rule_stone_wind": "تفتح الريح أطراف الحجر المعلّم.", "p1_title": "البذرة الصامتة", "p1_desc": "تستقر بذرة في الغبار. لا يبدو أنها تنتظر شيئاً، لكنها لم تمت.", "p2_title": "أرض عطشى", "p2_desc": "يرتعش برعم بجانب تربة جافة. لقد تغير مرة بالفعل. ما الذي يحتاجه؟", "p3_title": "أول تفتح", "p3_desc": "نمت النبتة، لكن برعمها ما زال مغلقاً. لقد اختفى ضوء النهار.", "p4_title": "قفزة حبوب اللقاح", "p4_desc": "تستقر بذرة على لوح معزول. تبدو العلامة على الأرض كتيار هواء.", "p5_title": "الحجر الحالم", "p5_desc": "يسد حجر الطريق. تبدو الرموز المحفورة حوله كأنها جملة.", "p6_title": "النظام الخفي", "p6_desc": "بذرة أخيرة. لا دليل جديد. ربما يكفي ما تعرفه بالفعل.", "success": "تم تأكيد القانون", "next": "تابع", "finish_title": "الحديقة تتذكر", "finish_desc": "لم يمنحك أحد القوانين. لقد أعدت اكتشافها. وراء الجدران أماكن أخرى تنتظر العقول الفضولية.", "restart": "أعد لعب الحديقة", "observed": "مكتشف", "notebook_empty": "لم تسجل أي قوانين بعد. جرّب، راقب، ثم أعد المحاولة.", "hint1": "تأمل طبيعة الشيء والرمز الذي قد يؤثر فيه.", "hint2": "قد ينطبق قانون اكتشفته على شيء مختلف.", "hint3": "الترتيب مهم: قد تكون الحالة نتيجة تجربة سابقة.", "notice": "لا توجد عقوبة. العالم لا يحكم على تجاربك.", "menu": "الحديقة الساكنة", "chapter": "الفصل الأول · الحديقة الساكنة"
-	}
-}
+const SYMBOL_GLYPHS: Dictionary = {"sun": "☼", "rain": "≋", "moon": "☾", "wind": "≈"}
 
-const PUZZLES := [
-	{"title": "p1_title", "desc": "p1_desc", "start": "seed", "goal": "sprout", "first": "sun", "target": "sun", "rule": "rule_sun", "hint": "hint1"},
-	{"title": "p2_title", "desc": "p2_desc", "start": "sprout", "goal": "sapling", "first": "rain", "target": "rain", "rule": "rule_rain", "hint": "hint2"},
-	{"title": "p3_title", "desc": "p3_desc", "start": "sapling", "goal": "bloom", "first": "moon", "target": "moon", "rule": "rule_moon", "hint": "hint2"},
-	{"title": "p4_title", "desc": "p4_desc", "start": "seed", "goal": "carried", "first": "wind", "target": "wind", "rule": "rule_wind", "hint": "hint1"},
-	{"title": "p5_title", "desc": "p5_desc", "start": "stone_cold", "goal": "stone_open", "first": "sun", "target": "wind", "rule": "rule_stone_wind", "hint": "hint3"},
-	{"title": "p6_title", "desc": "p6_desc", "start": "seed", "goal": "bloom", "first": "sun", "target": "moon", "rule": "rule_moon", "hint": "hint3"}
-]
-
-const TRANSITIONS := {
-	"seed|sun": "sprout",
-	"seed|wind": "carried",
-	"sprout|rain": "sapling",
-	"sapling|moon": "bloom",
-	"bud|moon": "bloom",
-	"stone_cold|sun": "stone_warm",
-	"stone_warm|moon": "stone_marked",
-	"stone_marked|wind": "stone_open"
-}
-
-const FEEDBACK := {
-	"seed|sun": "rule_sun", "sprout|rain": "rule_rain", "sapling|moon": "rule_moon", "seed|wind": "rule_wind",
-	"stone_cold|sun": "rule_stone_sun", "stone_warm|moon": "rule_stone_moon", "stone_marked|wind": "rule_stone_wind"
-}
-
-var lang: String = "fr"
-var screen: String = "home"
-var puzzle_index: int = 0
-var object_state: String = "seed"
-var selected_symbol: String = "sun"
-var discovered: Array[String] = []
-var status_text: String = ""
-var status_success: bool = false
-var hint_visible: bool = false
-var completed: bool = false
-var trial_count: int = 0
+var engine: Variant = PuzzleEngineScript.new()
+var save_service: Variant = SaveServiceScript.new()
+var garden: Variant
+var canvas: CanvasLayer
+var sfx_player: AudioStreamPlayer
 var ui_root: Control
-var art: Control
+var lang := "fr"
+var screen := "home"
+var previous_screen := "home"
+var puzzle_index := 0
+var selected_symbol := "sun"
+var status_kind := ""
+var status_law_id := ""
+var hint_visible := false
+var object_inspected := false
+var completed := false
+
+# Stable gameplay HUD references: routine interactions update these controls in place.
+var game_progress_label: Label
+var game_laws_label: Label
+var game_object_label: Label
+var game_status_label: Label
+var game_footer_label: Label
+var game_symbol_buttons: Dictionary = {}
+var game_apply_button: Button
+var game_next_button: Button
+var game_hint_button: Button
+var game_hint_panel: PanelContainer
+var game_hint_label: Label
 
 func _ready() -> void:
+	name = "LOrdreCacheGame"
+	garden = GardenWorldScript.new()
+	garden.name = "GardenWorld"
+	add_child(garden)
+	garden.target_selected.connect(_on_target_selected)
+	garden.symbol_selected.connect(_on_world_symbol_selected)
+	canvas = CanvasLayer.new()
+	canvas.name = "GameInterface"
+	add_child(canvas)
+	sfx_player = AudioStreamPlayer.new()
+	sfx_player.name = "SoundEffects"
+	sfx_player.volume_db = -6.0
+	add_child(sfx_player)
+	ui_root = Control.new()
+	ui_root.name = "UIRoot"
+	ui_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(ui_root)
 	_load_save()
-	_build_background()
+	garden.set_object_state(engine.state)
+	garden.set_selected_symbol(selected_symbol)
 	_draw_ui()
 
+func _unhandled_input(event: InputEvent) -> void:
+	if screen == "game" and object_inspected:
+		if event is InputEventScreenDrag:
+			garden.rotate_target_object(event.relative)
+			return
+		if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+			garden.rotate_target_object(event.relative)
+			return
+	var tap_position := Vector2.ZERO
+	var pressed := false
+	if event is InputEventScreenTouch and event.pressed:
+		tap_position = event.position
+		pressed = true
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		tap_position = event.position
+		pressed = true
+	if not pressed or screen in ["home", "notebook", "finish"]:
+		return
+	if not is_instance_valid(garden):
+		return
+	var active_camera: Camera3D = garden.camera
+	if active_camera == null:
+		return
+	var ray_origin := active_camera.project_ray_origin(tap_position)
+	var ray_end := ray_origin + active_camera.project_ray_normal(tap_position) * 100.0
+	var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	query.collision_mask = 1
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return
+	var collider = hit.get("collider")
+	if collider is Node and (collider as Node).has_meta("interaction_id"):
+		garden.activate_interaction(str((collider as Node).get_meta("interaction_id")))
+
 func _load_save() -> void:
-	var cfg := ConfigFile.new()
-	if cfg.load(SAVE_PATH) == OK:
-		puzzle_index = clampi(int(cfg.get_value("progress", "puzzle_index", 0)), 0, PUZZLES.size() - 1)
-		var saved_discovered: Variant = cfg.get_value("progress", "discovered", [])
-		discovered.clear()
-		if saved_discovered is Array:
-			for item in saved_discovered:
-				if item is String and not discovered.has(item):
-					discovered.append(item)
-		lang = str(cfg.get_value("settings", "language", "fr"))
-		completed = bool(cfg.get_value("progress", "completed", false))
-		object_state = str(cfg.get_value("progress", "object_state", str(PUZZLES[puzzle_index]["start"])))
-		status_text = str(cfg.get_value("progress", "status_text", ""))
-		status_success = bool(cfg.get_value("progress", "status_success", false))
-		selected_symbol = str(cfg.get_value("progress", "selected_symbol", str(PUZZLES[puzzle_index]["first"])))
-	if not TEXT.has(lang):
-		lang = "fr"
-	if object_state.is_empty():
-		object_state = str(PUZZLES[puzzle_index]["start"])
+	var saved: Dictionary = save_service.load_snapshot()
+	lang = str(saved["language"])
+	puzzle_index = int(saved["puzzle_index"])
+	var restored_laws: Array[String] = []
+	var saved_laws: Variant = saved.get("discovered", [])
+	if saved_laws is Array:
+		for law_id in saved_laws:
+			if law_id is String:
+				restored_laws.append(law_id)
+	engine.restore(str(saved["object_state"]), restored_laws)
+	selected_symbol = str(saved["selected_symbol"])
+	completed = bool(saved["completed"])
+	status_kind = "solved" if bool(saved["status_success"]) else ""
+	status_law_id = ""
 
 func _save() -> void:
-	var cfg := ConfigFile.new()
-	cfg.set_value("progress", "puzzle_index", puzzle_index)
-	cfg.set_value("progress", "discovered", discovered)
-	cfg.set_value("progress", "completed", completed)
-	cfg.set_value("progress", "object_state", object_state)
-	cfg.set_value("progress", "status_text", status_text)
-	cfg.set_value("progress", "status_success", status_success)
-	cfg.set_value("progress", "selected_symbol", selected_symbol)
-	cfg.set_value("settings", "language", lang)
-	var err := cfg.save(SAVE_PATH)
-	if err != OK:
-		push_warning("Could not save local progress: %s" % err)
+	var snapshot := {
+		"language": lang,
+		"puzzle_index": puzzle_index,
+		"discovered": engine.discovered,
+		"completed": completed,
+		"object_state": engine.state,
+		"status_success": status_kind == "solved" or (engine.state == str(Catalog.PUZZLES[puzzle_index]["goal"]) and completed),
+		"selected_symbol": selected_symbol
+	}
+	if not save_service.save_snapshot(snapshot):
+		push_warning("Could not save local progress.")
 
 func _t(key: String) -> String:
-	return str(TEXT.get(lang, TEXT["fr"]).get(key, TEXT["fr"].get(key, key)))
-
-func _build_background() -> void:
-	art = Control.new()
-	art.name = "Atmosphere"
-	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	art.draw.connect(_draw_atmosphere)
-	art.resized.connect(func(): art.queue_redraw())
-	add_child(art)
-	move_child(art, 0)
-
-func _draw_atmosphere() -> void:
-	var size := art.size
-	var rect := Rect2(Vector2.ZERO, size)
-	var background := load("res://assets/garden_background.jpg") as Texture2D
-	if background != null:
-		# The original painted environment is tinted slightly cool so foreground text stays legible.
-		art.draw_texture_rect(background, rect, false, Color(0.72, 0.82, 0.84, 1.0))
-	else:
-		art.draw_rect(rect, Color("080f1e"))
-	art.draw_rect(rect, Color(0.015, 0.035, 0.065, 0.36))
-	# Soft foreground veil, restrained so the altar remains visible beneath the UI.
-	art.draw_rect(Rect2(0, size.y * 0.55, size.x, size.y * 0.45), Color(0.015, 0.04, 0.06, 0.24))
-	for i in range(32):
-		var fx := fmod(float(i * 83 + 31), maxf(size.x, 1.0))
-		var fy := fmod(float(i * 139 + 67), maxf(size.y, 1.0))
-		art.draw_circle(Vector2(fx, fy), 1.0 + float(i % 3) * 0.55, Color(0.66, 0.91, 0.81, 0.24))
-
-func _style_panel(color: Color = Color("111d2b"), border_color: Color = Color("35535b")) -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = color
-	s.border_color = border_color
-	s.set_border_width_all(1)
-	s.set_corner_radius_all(14)
-	s.content_margin_left = 16
-	s.content_margin_right = 16
-	s.content_margin_top = 12
-	s.content_margin_bottom = 12
-	return s
-
-func _make_label(value: String, font_size: int = 16, color: Color = Color("e2ece7"), bold: bool = false) -> Label:
-	var l := Label.new()
-	l.text = value
-	l.add_theme_font_size_override("font_size", font_size)
-	l.add_theme_color_override("font_color", color)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if bold:
-		l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.2))
-	return l
-
-func _make_button(value: String, callback: Callable, primary: bool = false) -> Button:
-	var b := Button.new()
-	b.text = value
-	b.custom_minimum_size = Vector2(0, 48)
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 15)
-	var normal := _style_panel(Color("b6e4cf") if primary else Color("152635"), Color("b6e4cf") if primary else Color("46606a"))
-	var hover := _style_panel(Color("d3f3dc") if primary else Color("1e3544"), Color("ddf7e4") if primary else Color("79b9ad"))
-	b.add_theme_stylebox_override("normal", normal)
-	b.add_theme_stylebox_override("hover", hover)
-	b.add_theme_stylebox_override("pressed", hover)
-	b.add_theme_stylebox_override("focus", _style_panel(Color("152635"), Color("79b9ad")))
-	b.add_theme_color_override("font_color", Color("0b1c20") if primary else Color("e2ece7"))
-	b.add_theme_color_override("font_hover_color", Color("061518") if primary else Color("ffffff"))
-	b.pressed.connect(callback)
-	return b
+	var dictionary: Dictionary = Localization.TEXT.get(lang, Localization.TEXT["fr"])
+	return str(dictionary.get(key, Localization.TEXT["fr"].get(key, key)))
 
 func _draw_ui() -> void:
-	if is_instance_valid(ui_root):
-		ui_root.queue_free()
-	ui_root = Control.new()
-	ui_root.name = "Interface"
-	ui_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui_root.offset_left = 18
-	ui_root.offset_right = -18
-	ui_root.offset_top = 18
-	ui_root.offset_bottom = -18
+	# Full HUD reconstruction is reserved for screen/language changes, never world actions.
+	for child in ui_root.get_children():
+		ui_root.remove_child(child)
+		child.queue_free()
+	_reset_game_ui_refs()
 	ui_root.layout_direction = Control.LAYOUT_DIRECTION_RTL if lang == "ar" else Control.LAYOUT_DIRECTION_LTR
-	add_child(ui_root)
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	ui_root.add_child(scroll)
-	var col := VBoxContainer.new()
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_theme_constant_override("separation", 12)
-	scroll.add_child(col)
-	if screen == "home":
-		_build_home(col)
-	elif screen == "notebook":
-		_build_notebook(col)
-	elif screen == "finish":
-		_build_finish(col)
-	else:
-		_build_game(col)
+	_build_header()
+	match screen:
+		"home": _build_home()
+		"notebook": _build_notebook()
+		"finish": _build_finish()
+		_: _build_game()
 
-func _build_header(parent: VBoxContainer, subtitle: String) -> void:
+func _reset_game_ui_refs() -> void:
+	game_progress_label = null
+	game_laws_label = null
+	game_object_label = null
+	game_status_label = null
+	game_footer_label = null
+	game_symbol_buttons.clear()
+	game_apply_button = null
+	game_next_button = null
+	game_hint_button = null
+	game_hint_panel = null
+	game_hint_label = null
+
+func _build_header() -> void:
+	var panel := _panel("Header", 12.0, 12.0, -12.0, 108.0, 0.91)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	parent.add_child(row)
-	var brand := VBoxContainer.new()
-	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	brand.add_child(_make_label("L’ORDRE CACHÉ", 18, Color("c0ead7"), true))
-	brand.add_child(_make_label(subtitle, 9, Color("94b2b7")))
-	row.add_child(brand)
-	var langs := OptionButton.new()
-	langs.custom_minimum_size = Vector2(74, 38)
-	langs.add_theme_font_size_override("font_size", 12)
-	langs.add_item("FR", 0)
-	langs.add_item("EN", 1)
-	langs.add_item("عربي", 2)
-	langs.select(["fr", "en", "ar"].find(lang))
-	langs.item_selected.connect(_on_language_selected)
-	row.add_child(langs)
+	row.add_theme_constant_override("separation", 10)
+	panel.add_child(row)
+	var brand_col := VBoxContainer.new()
+	brand_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	brand_col.add_child(_label(_t("brand"), 18, Color("d7f2e2"), true))
+	brand_col.add_child(_label(_t("chapter") if screen != "home" else _t("tagline"), 9, Color("a5c2b8")))
+	row.add_child(brand_col)
+	var language := OptionButton.new()
+	language.custom_minimum_size = Vector2(78, 42)
+	language.add_theme_font_size_override("font_size", 13)
+	language.add_item("FR", 0)
+	language.add_item("EN", 1)
+	language.add_item("عربي", 2)
+	language.select(["fr", "en", "ar"].find(lang))
+	language.item_selected.connect(_on_language_selected)
+	row.add_child(language)
+	if screen in ["game", "notebook", "finish"]:
+		var home_button := _button("⌂", _go_home, false)
+		home_button.custom_minimum_size = Vector2(42, 42)
+		row.add_child(home_button)
 
-func _build_home(parent: VBoxContainer) -> void:
-	_build_header(parent, _t("subtitle"))
-	var spacer := Control.new()
-	spacer.custom_minimum_size.y = 24
-	parent.add_child(spacer)
-	var art_card := PanelContainer.new()
-	art_card.add_theme_stylebox_override("panel", _style_panel(Color("101b29"), Color("41636b")))
-	art_card.custom_minimum_size.y = 240
-	parent.add_child(art_card)
-	var art_col := VBoxContainer.new()
-	art_col.alignment = BoxContainer.ALIGNMENT_CENTER
-	art_col.add_theme_constant_override("separation", 8)
-	art_card.add_child(art_col)
-	var symbol := _make_label("✦", 62, Color("b6e4cf"), true)
-	symbol.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	art_col.add_child(symbol)
-	var title := _make_label("L’ORDRE\nCACHÉ", 34, Color("edf7ed"), true)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	art_col.add_child(title)
-	var line := _make_label("✧     ⟡     ✧", 16, Color("78bdb0"))
-	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	art_col.add_child(line)
-	var intro := _make_label(_t("home_intro"), 17, Color("d4e3dc"))
-	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	parent.add_child(intro)
-	var cta := PanelContainer.new()
-	cta.add_theme_stylebox_override("panel", _style_panel(Color(0.05, 0.11, 0.16, 0.92), Color("2d4d56")))
-	parent.add_child(cta)
-	cta.add_child(_make_label(_t("home_cta"), 14, Color("9ec3bc")))
-	var btn_text := _t("start") if puzzle_index == 0 and not completed and not status_success else _t("continue")
-	parent.add_child(_make_button(btn_text, _start_game, true))
-	parent.add_child(_make_button(_t("journal"), _open_notebook))
-	parent.add_child(_make_label("OFFLINE · SAUVEGARDE LOCALE · CHAPITRE I", 10, Color("77989d")))
-
-func _build_game(parent: VBoxContainer) -> void:
-	var p: Dictionary = PUZZLES[puzzle_index]
-	_build_header(parent, _t("chapter"))
-	var top := HBoxContainer.new()
-	top.add_child(_make_label("%02d / %02d" % [puzzle_index + 1, PUZZLES.size()], 12, Color("b8e2d0"), true))
-	var flex := Control.new()
-	flex.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(flex)
-	top.add_child(_make_label("✦ %d" % discovered.size(), 12, Color("b8e2d0")))
-	parent.add_child(top)
-	var title := _make_label(_t(str(p["title"])), 25, Color("f0f4e9"), true)
-	parent.add_child(title)
-	parent.add_child(_make_label(_t(str(p["desc"])), 14, Color("b5c9c6")))
-	var scene_card := PanelContainer.new()
-	scene_card.add_theme_stylebox_override("panel", _style_panel(Color("0b1623"), Color("37545d")))
-	scene_card.custom_minimum_size.y = 182
-	parent.add_child(scene_card)
-	var scene_col := VBoxContainer.new()
-	scene_col.alignment = BoxContainer.ALIGNMENT_CENTER
-	scene_col.add_theme_constant_override("separation", 6)
-	scene_card.add_child(scene_col)
-	var illustration := _make_label(_state_symbol(object_state), 60, Color("b6e4cf"), true)
-	illustration.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	scene_col.add_child(illustration)
-	var state_label := _make_label(_t(object_state), 15, Color("e7eee4"), true)
-	state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	scene_col.add_child(state_label)
-	var micro := _make_label("·   ·   ·", 14, Color("628f91"))
-	micro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	scene_col.add_child(micro)
-	parent.add_child(_make_label(_t("experiment"), 13, Color("94b6b3")))
-	var symbols := GridContainer.new()
-	symbols.columns = 2
-	symbols.add_theme_constant_override("h_separation", 8)
-	symbols.add_theme_constant_override("v_separation", 8)
-	parent.add_child(symbols)
-	for symbol in SYMBOLS:
-		var chosen: bool = (selected_symbol == symbol)
-		var btn := _make_button(_symbol_icon(symbol) + "  " + _t(symbol), func(): _select_symbol(symbol), chosen)
-		btn.custom_minimum_size.y = 48
-		symbols.add_child(btn)
-	if not status_text.is_empty():
-		var status_panel := PanelContainer.new()
-		status_panel.add_theme_stylebox_override("panel", _style_panel(Color("17322f") if status_success else Color("121f2a"), Color("6cba9e") if status_success else Color("395965")))
-		parent.add_child(status_panel)
-		status_panel.add_child(_make_label(status_text, 13, Color("d7f1de") if status_success else Color("b9d0d0")))
-	if status_success:
-		parent.add_child(_make_button(_t("next") if puzzle_index < PUZZLES.size() - 1 else _t("finish_title"), _advance, true))
-	else:
-		parent.add_child(_make_button(_t("trial"), _observe, true))
-	parent.add_child(_make_button(_t("hint"), _toggle_hint))
-	if hint_visible:
-		var h := PanelContainer.new()
-		h.add_theme_stylebox_override("panel", _style_panel(Color("111d29"), Color("9caa8e")))
-		parent.add_child(h)
-		h.add_child(_make_label(_t(str(p["hint"])), 13, Color("cfdacb")))
-	parent.add_child(_make_button(_t("journal"), _open_notebook))
-	parent.add_child(_make_button(_t("reset"), _reset_trial))
-	parent.add_child(_make_label(_t("notice"), 10, Color("728f92")))
-
-func _build_notebook(parent: VBoxContainer) -> void:
-	_build_header(parent, _t("journal"))
-	parent.add_child(_make_label(_t("journal"), 24, Color("eff7e9"), true))
-	parent.add_child(_make_label(_t("notebook_empty") if discovered.is_empty() else "%d  %s" % [discovered.size(), _t("progress")], 13, Color("a8c9c0")))
-	if discovered.is_empty():
-		var empty_panel := PanelContainer.new()
-		empty_panel.add_theme_stylebox_override("panel", _style_panel())
-		parent.add_child(empty_panel)
-		empty_panel.add_child(_make_label(_t("notebook_empty"), 14))
-	else:
-		for rule_id in discovered:
-			var panel := PanelContainer.new()
-			panel.add_theme_stylebox_override("panel", _style_panel(Color("10241f"), Color("3c7466")))
-			parent.add_child(panel)
-			var v := VBoxContainer.new()
-			v.add_child(_make_label("✦  " + _t("observed"), 10, Color("8dc8ac"), true))
-			v.add_child(_make_label(_t(rule_id), 15, Color("e2eee1")))
-			panel.add_child(v)
-	parent.add_child(_make_button(_t("back"), _back_from_notebook))
-	parent.add_child(_make_label("L’ORDRE CACHÉ · NOTES PERSONNELLES", 10, Color("77989d")))
-
-
-func _build_finish(parent: VBoxContainer) -> void:
-	_build_header(parent, _t("chapter"))
-	var spacer := Control.new()
-	spacer.custom_minimum_size.y = 38
-	parent.add_child(spacer)
-	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", _style_panel(Color("101d2b"), Color("83bda9")))
-	card.custom_minimum_size.y = 330
-	parent.add_child(card)
+func _build_home() -> void:
+	var card := _panel("WelcomeCard", 22.0, 0.27, -22.0, 0.73, 0.91, true)
 	var content := VBoxContainer.new()
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.add_theme_constant_override("separation", 14)
 	card.add_child(content)
-	var sigil := _make_label("✧  ✦  ✧", 34, Color("b6e4cf"), true)
-	sigil.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(sigil)
-	var title := _make_label(_t("finish_title"), 26, Color("edf6e8"), true)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(title)
-	var desc := _make_label(_t("finish_desc"), 15, Color("c1d6ce"))
-	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(desc)
-	parent.add_child(_make_label("%d / %d  ·  %s" % [discovered.size(), 7, _t("progress")], 12, Color("9cc7b6")))
-	parent.add_child(_make_button(_t("restart"), _replay, true))
-	parent.add_child(_make_button(_t("journal"), _open_notebook))
-	parent.add_child(_make_button(_t("back"), _go_home))
+	content.add_child(_label(_t("home_kicker"), 10, Color("9ce3c6"), true, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label("✦", 50, Color("b9e8d2"), true, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label(_t("home_title"), 29, Color("f0f5e8"), true, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label(_t("home_intro"), 15, Color("c2d6cc"), false, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label(_t("home_note"), 11, Color("9abdb1"), false, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_button(_t("continue") if puzzle_index > 0 or completed else _t("start"), _start_game, true))
+	content.add_child(_button(_t("notebook"), _open_notebook, false))
 
-func _replay() -> void:
-	puzzle_index = 0
-	object_state = str(PUZZLES[0]["start"])
-	selected_symbol = "sun"
-	status_text = ""
-	status_success = false
-	hint_visible = false
-	completed = false
-	trial_count = 0
-	screen = "game"
+func _build_game() -> void:
+	var puzzle: Dictionary = Catalog.PUZZLES[puzzle_index]
+	var panel := _panel("InteractionPanel", 12.0, 0.52, -12.0, -12.0, 0.94, false)
+	var scroller := ScrollContainer.new()
+	scroller.name = "InteractionScroll"
+	scroller.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroller.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroller.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroller)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 7)
+	scroller.add_child(content)
+
+	var progress := HBoxContainer.new()
+	game_progress_label = _label("", 10, Color("a3e5c9"), true)
+	progress.add_child(game_progress_label)
+	var flex := Control.new()
+	flex.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress.add_child(flex)
+	game_laws_label = _label("", 10, Color("a3e5c9"), true)
+	progress.add_child(game_laws_label)
+	content.add_child(progress)
+	content.add_child(_label(_t(str(puzzle["title"])), 21, Color("f0f5e8"), true))
+	content.add_child(_label(_t(str(puzzle["desc"])), 12, Color("c1d4cc")))
+	game_object_label = _label("", 11, Color("9ce3c6"), true)
+	content.add_child(game_object_label)
+	var status_panel := _panel("Status", 0.0, 0.0, 0.0, 0.0, 0.88, false, content)
+	game_status_label = _label("", 12, Color("d8efdf"))
+	status_panel.add_child(game_status_label)
+
+	var symbols := GridContainer.new()
+	symbols.columns = 2
+	symbols.add_theme_constant_override("h_separation", 8)
+	symbols.add_theme_constant_override("v_separation", 6)
+	content.add_child(symbols)
+	for symbol in Catalog.SYMBOLS:
+		var callback := Callable(self, "_select_symbol").bind(symbol)
+		var button := _button(_symbol_label(symbol), callback, selected_symbol == symbol)
+		button.custom_minimum_size.y = 39
+		symbols.add_child(button)
+		game_symbol_buttons[symbol] = button
+
+	game_apply_button = _button(_t("apply"), _observe, true)
+	content.add_child(game_apply_button)
+	game_next_button = _button("", _advance, true)
+	content.add_child(game_next_button)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	game_hint_button = _button("", _toggle_hint, false)
+	actions.add_child(game_hint_button)
+	actions.add_child(_button(_t("reset"), _reset_trial, false))
+	content.add_child(actions)
+	game_hint_panel = _panel("Hint", 0.0, 0.0, 0.0, 0.0, 0.82, false, content)
+	game_hint_label = _label("", 12, Color("d2dfd6"))
+	game_hint_panel.add_child(game_hint_label)
+	game_footer_label = _label("", 10, Color("87aaa0"))
+	content.add_child(game_footer_label)
+	content.add_child(_button(_t("notebook"), _open_notebook, false))
+	_refresh_game_ui()
+
+func _refresh_game_ui() -> void:
+	if screen != "game" or not is_instance_valid(game_status_label):
+		return
+	var puzzle: Dictionary = Catalog.PUZZLES[puzzle_index]
+	var solved := status_kind == "solved" or (engine.state == str(puzzle["goal"]) and completed)
+	game_progress_label.text = "%02d / %02d" % [puzzle_index + 1, Catalog.PUZZLES.size()]
+	game_laws_label.text = "✦ %d / %d" % [engine.discovered.size(), Catalog.KNOWN_LAWS.size()]
+	game_object_label.text = _t("object") + " · " + _t(engine.state)
+	game_status_label.text = _current_status_text()
+	game_footer_label.text = _t("tap_object") if not object_inspected else _t("drag_object")
+	game_apply_button.visible = not solved
+	game_next_button.visible = solved
+	game_next_button.text = _t("next") if puzzle_index < Catalog.PUZZLES.size() - 1 else _t("finish_title")
+	game_hint_button.text = _t("hide_hint") if hint_visible else _t("hint")
+	game_hint_panel.visible = hint_visible
+	game_hint_label.text = _t(str(puzzle["hint"]))
+	for symbol_id in game_symbol_buttons:
+		var button: Button = game_symbol_buttons[symbol_id]
+		_set_button_appearance(button, symbol_id == selected_symbol)
+
+func _build_notebook() -> void:
+	var card := _panel("NotebookCard", 18.0, 0.145, -18.0, -18.0, 0.96, false)
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 10)
+	card.add_child(outer)
+	outer.add_child(_label(_t("notebook"), 23, Color("eff7e9"), true))
+	outer.add_child(_label("%d / %d %s" % [engine.discovered.size(), Catalog.KNOWN_LAWS.size(), _t("laws")], 12, Color("a7d0bf")))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 8)
+	scroll.add_child(list)
+	if engine.discovered.is_empty():
+		list.add_child(_label(_t("notebook_empty"), 14, Color("c5d7ce")))
+	else:
+		for law_id in engine.discovered:
+			var law_panel := _panel("DiscoveredLaw", 0.0, 0.0, 0.0, 0.0, 0.88, false, list)
+			law_panel.add_child(_label("✦  " + _t("observed"), 9, Color("92d9b8"), true))
+			law_panel.add_child(_label(_t(law_id), 15, Color("e2eee1")))
+	outer.add_child(_button(_t("back"), _back_from_notebook, true))
+	outer.add_child(_button(_t("home"), _go_home, false))
+
+func _build_finish() -> void:
+	var card := _panel("FinishCard", 22.0, 0.27, -22.0, 0.75, 0.95, true)
+	var content := VBoxContainer.new()
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 13)
+	card.add_child(content)
+	content.add_child(_label("✧  ✦  ✧", 35, Color("b6e4cf"), true, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label(_t("finish_title"), 25, Color("edf6e8"), true, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label(_t("finish_desc"), 14, Color("c1d6ce"), false, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_label("%d / %d · %s" % [engine.discovered.size(), Catalog.KNOWN_LAWS.size(), _t("progress")], 12, Color("9cc7b6"), false, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(_button(_t("replay"), _replay, true))
+	content.add_child(_button(_t("notebook"), _open_notebook, false))
+	content.add_child(_button(_t("home"), _go_home, false))
+
+func _panel(panel_name: String, left: float, top: float, right: float, bottom: float, alpha: float = 0.92, centered: bool = false, parent: Control = null) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.name = panel_name
+	p.add_theme_stylebox_override("panel", _panel_style(Color(0.035, 0.075, 0.09, alpha), Color("4a746b")))
+	if parent != null:
+		p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		parent.add_child(p)
+	else:
+		ui_root.add_child(p)
+		if centered:
+			p.anchor_left = 0.07
+			p.anchor_right = 0.93
+			p.anchor_top = top
+			p.anchor_bottom = bottom
+			p.offset_left = 0.0
+			p.offset_right = 0.0
+			p.offset_top = 0.0
+			p.offset_bottom = 0.0
+		else:
+			p.anchor_left = 0.0
+			p.anchor_right = 1.0
+			p.offset_left = left
+			p.offset_right = right
+			if top > 1.0 or bottom > 1.0:
+				# Fixed top/bottom pixel offsets (for the HUD header).
+				p.anchor_top = 0.0
+				p.anchor_bottom = 0.0
+				p.offset_top = top
+				p.offset_bottom = bottom
+			elif bottom < 0.0:
+				# A top anchor plus a bottom inset (game panel/notebook).
+				p.anchor_top = top
+				p.anchor_bottom = 1.0
+				p.offset_top = 0.0
+				p.offset_bottom = bottom
+			else:
+				p.anchor_top = top
+				p.anchor_bottom = bottom
+				p.offset_top = 0.0
+				p.offset_bottom = 0.0
+	return p
+
+func _panel_style(color: Color, border_color: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_color = border_color
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(16)
+	style.content_margin_left = 14.0
+	style.content_margin_right = 14.0
+	style.content_margin_top = 12.0
+	style.content_margin_bottom = 12.0
+	return style
+
+func _label(value: String, font_size: int = 14, color: Color = Color("e2ece7"), bold: bool = false, alignment: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	var label := Label.new()
+	label.text = value
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.horizontal_alignment = alignment
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if bold:
+		label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.22))
+	return label
+
+func _button(value: String, callback: Callable, primary: bool = false) -> Button:
+	var button := Button.new()
+	button.text = value
+	button.custom_minimum_size = Vector2(0.0, 42.0)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 13)
+	_set_button_appearance(button, primary)
+	button.pressed.connect(callback)
+	return button
+
+func _set_button_appearance(button: Button, primary: bool) -> void:
+	var normal_color := Color("b6e4cf") if primary else Color("142a32")
+	var border_color := Color("c3edda") if primary else Color("3d625e")
+	button.add_theme_stylebox_override("normal", _button_style(normal_color, border_color))
+	button.add_theme_stylebox_override("hover", _button_style(normal_color.lightened(0.10), border_color.lightened(0.16)))
+	button.add_theme_stylebox_override("pressed", _button_style(normal_color.darkened(0.08), border_color))
+	button.add_theme_stylebox_override("focus", _button_style(normal_color, border_color))
+	button.add_theme_color_override("font_color", Color("0b1c20") if primary else Color("e2ece7"))
+	button.add_theme_color_override("font_hover_color", Color("071417") if primary else Color("ffffff"))
+
+func _button_style(background: Color, border: Color) -> StyleBoxFlat:
+	var style := _panel_style(background, border)
+	style.set_corner_radius_all(11)
+	style.content_margin_left = 9.0
+	style.content_margin_right = 9.0
+	style.content_margin_top = 7.0
+	style.content_margin_bottom = 7.0
+	return style
+
+func _symbol_label(symbol_id: String) -> String:
+	return "%s   %s" % [str(SYMBOL_GLYPHS.get(symbol_id, "✦")), _t(symbol_id)]
+
+func _play_sound(sound_id: String) -> void:
+	if not is_instance_valid(sfx_player):
+		return
+	match sound_id:
+		"select": sfx_player.stream = SOUND_SELECT
+		"discovery": sfx_player.stream = SOUND_DISCOVERY
+		"no_change": sfx_player.stream = SOUND_NO_CHANGE
+		_: return
+	sfx_player.play()
+
+func _current_status_text() -> String:
+	if status_kind.is_empty():
+		return _t("experiment")
+	var result := ""
+	match status_kind:
+		"no_change": result = _t("no_change")
+		"inspected": result = _t("inspected") + " — " + _t(engine.state)
+		"symbol_selected": result = _t("selected") + " : " + _t(selected_symbol)
+		"law_found": result = _t("law_found") + " — " + _t(status_law_id)
+		"law_known": result = _t("law_known")
+		"changed": result = _t("result")
+		"solved": result = _t("solved") + (" — " + _t(status_law_id) if not status_law_id.is_empty() else "")
+		_: result = _t("experiment")
+	return result
+
+func _on_target_selected() -> void:
+	object_inspected = true
+	if status_kind != "solved":
+		status_kind = "inspected"
+		status_law_id = ""
+	_refresh_game_ui()
+
+func _on_world_symbol_selected(symbol_id: String) -> void:
+	if Catalog.SYMBOLS.has(symbol_id):
+		_select_symbol(symbol_id)
+
+func _select_symbol(symbol_id: String) -> void:
+	if status_kind == "solved":
+		return
+	if not Catalog.SYMBOLS.has(symbol_id):
+		return
+	selected_symbol = symbol_id
+	garden.set_selected_symbol(selected_symbol)
+	_play_sound("select")
+	status_kind = "symbol_selected"
+	status_law_id = ""
 	_save()
+	_refresh_game_ui()
+
+func _observe() -> void:
+	if screen != "game" or status_kind == "solved":
+		return
+	var outcome: Dictionary = engine.observe(selected_symbol, puzzle_index)
+	garden.set_object_state(engine.state)
+	if not bool(outcome["changed"]):
+		status_kind = "no_change"
+		status_law_id = ""
+		_play_sound("no_change")
+	else:
+		if bool(outcome["new_law"]):
+			_play_sound("discovery")
+		status_law_id = str(outcome["law_id"])
+		if bool(outcome["solved"]):
+			status_kind = "solved"
+			if puzzle_index == Catalog.PUZZLES.size() - 1:
+				completed = true
+		elif bool(outcome["new_law"]):
+			status_kind = "law_found"
+		else:
+			status_kind = "changed" if status_law_id.is_empty() else "law_known"
+	_save()
+	_refresh_game_ui()
+
+func _advance() -> void:
+	if screen != "game" or status_kind != "solved":
+		return
+	if puzzle_index < Catalog.PUZZLES.size() - 1:
+		puzzle_index += 1
+		engine.begin_puzzle(puzzle_index)
+		selected_symbol = str(Catalog.PUZZLES[puzzle_index]["first"])
+		status_kind = ""
+		status_law_id = ""
+		hint_visible = false
+		object_inspected = false
+		garden.set_object_state(engine.state)
+		garden.set_selected_symbol(selected_symbol)
+		screen = "game"
+	else:
+		screen = "finish"
+		status_kind = ""
+	_save()
+	_draw_ui()
+
+func _toggle_hint() -> void:
+	hint_visible = not hint_visible
+	_refresh_game_ui()
+
+func _reset_trial() -> void:
+	engine.begin_puzzle(puzzle_index)
+	status_kind = ""
+	status_law_id = ""
+	hint_visible = false
+	object_inspected = false
+	completed = false if puzzle_index == Catalog.PUZZLES.size() - 1 else completed
+	garden.set_object_state(engine.state)
+	_save()
+	_refresh_game_ui()
+
+func _open_notebook() -> void:
+	if screen != "notebook":
+		previous_screen = screen
+	screen = "notebook"
+	_draw_ui()
+
+func _back_from_notebook() -> void:
+	screen = previous_screen if previous_screen in ["home", "game", "finish"] else "home"
+	_draw_ui()
+
+func _start_game() -> void:
+	screen = "finish" if completed else "game"
 	_draw_ui()
 
 func _go_home() -> void:
 	screen = "home"
 	_draw_ui()
 
-func _start_game() -> void:
-	screen = "game"
-	if completed:
-		screen = "finish"
-	_draw_ui()
-
-func _select_symbol(symbol: String) -> void:
-	if status_success:
-		return
-	selected_symbol = symbol
-	status_text = ""
-	status_success = false
-	_draw_ui()
-
-func _observe() -> void:
-	if screen == "finish" or status_success:
-		return
-	trial_count += 1
-	var before := object_state
-	var transition_key := "%s|%s" % [object_state, selected_symbol]
-	if TRANSITIONS.has(transition_key):
-		object_state = str(TRANSITIONS[transition_key])
-		status_text = _t(str(FEEDBACK.get(transition_key, "result")))
-		if transition_key == "stone_marked|wind":
-			_discover("rule_stone_sun")
-			_discover("rule_stone_moon")
-			_discover("rule_stone_wind")
-		elif FEEDBACK.has(transition_key):
-			_discover(str(FEEDBACK[transition_key]))
-		status_success = object_state == str(PUZZLES[puzzle_index]["goal"])
-		if status_success:
-			status_text = _t("success") + " — " + status_text
-			if puzzle_index == PUZZLES.size() - 1:
-				completed = true
-		_save()
-	else:
-		status_text = _t("no_change")
-		status_success = false
-	if before == object_state:
-		push_warning("Transition returned the same object state")
-	_save()
-	_draw_ui()
-
-func _discover(rule_id: String) -> void:
-	if not discovered.has(rule_id):
-		discovered.append(rule_id)
-
-func _advance() -> void:
-	if puzzle_index < PUZZLES.size() - 1:
-		puzzle_index += 1
-		object_state = str(PUZZLES[puzzle_index]["start"])
-		selected_symbol = str(PUZZLES[puzzle_index]["first"])
-		status_text = ""
-		status_success = false
-		hint_visible = false
-		screen = "game"
-	else:
-		screen = "finish"
-		status_text = ""
-		status_success = false
-	_save()
-	_draw_ui()
-
-func _toggle_hint() -> void:
-	hint_visible = not hint_visible
-	_draw_ui()
-
-func _reset_trial() -> void:
-	object_state = str(PUZZLES[puzzle_index]["start"])
-	status_text = ""
-	status_success = false
+func _replay() -> void:
+	puzzle_index = 0
+	engine.begin_puzzle(0)
+	selected_symbol = "sun"
+	status_kind = ""
+	status_law_id = ""
 	hint_visible = false
+	object_inspected = false
+	completed = false
+	screen = "game"
+	garden.set_object_state(engine.state)
+	garden.set_selected_symbol(selected_symbol)
 	_save()
-	_draw_ui()
-
-func _open_notebook() -> void:
-	screen = "notebook"
-	_draw_ui()
-
-func _back_from_notebook() -> void:
-	screen = "game" if not completed else "finish"
 	_draw_ui()
 
 func _on_language_selected(index: int) -> void:
-	lang = ["fr", "en", "ar"][index]
-	_save()
-	_draw_ui()
-
-func _state_symbol(state: String) -> String:
-	var symbols := {"seed": "◉", "sprout": "♧", "sapling": "♣", "bloom": "✿", "carried": "❧", "bud": "❀", "stone_cold": "⬟", "stone_warm": "⬢", "stone_marked": "◈", "stone_open": "◇"}
-	return str(symbols.get(state, "✧"))
-
-func _symbol_icon(symbol: String) -> String:
-	return str({"sun": "☼", "rain": "⌁", "moon": "☾", "wind": "≋"}.get(symbol, "✧"))
+	var options: Array[String] = ["fr", "en", "ar"]
+	if index >= 0 and index < options.size():
+		lang = options[index]
+		_save()
+		_draw_ui()

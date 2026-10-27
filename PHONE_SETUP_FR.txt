@@ -1,16 +1,18 @@
 MISE EN ROUTE DEPUIS UN TÉLÉPHONE
 
-Option A — dépôt GitHub avec les fichiers extraits
+Fichier du projet : LOrdreCache_3D_Refonte_ANDROID_CI.zip
+
+Option A — déposer les fichiers du projet dans GitHub
 1. Crée un dépôt GitHub vide.
-2. Extrait le ZIP sur le téléphone ou dans un outil de fichiers qui gère les archives.
-3. Téléverse le contenu du dossier du projet en conservant les dossiers, notamment .github/workflows.
-4. Vérifie Actions : le workflow « Build L'Ordre Caché » se lancera lors du push sur main.
+2. Extrais le ZIP sur le téléphone avec une application de fichiers qui gère les archives.
+3. Téléverse le contenu du dossier du projet dans la racine du dépôt. Conserve notamment .github/workflows/build.yml.
+4. Ouvre Actions. Le workflow « Build L'Ordre Caché 3D Android » valide le projet, lance les tests, puis exporte un APK Android de débogage.
 
-Option B — garder le projet en un ZIP dans le dépôt (moins de fichiers à téléverser)
-1. Crée un dépôt GitHub vide et téléverse LOrdreCache_Godot_Project_and_CI.zip à la racine.
-2. Dans GitHub, choisis Add file > Create new file.
-3. Pour le chemin, saisis .github/workflows/build-from-zip.yml.
-4. Copie le contenu du fichier compagnon LOrdreCache_GitHub_Build_From_Zip.yml, puis valide le commit sur main.
-5. Ouvre Actions et télécharge l'artefact LOrdreCache-build-<numéro> lorsque le workflow se termine.
+Option B — téléverser un seul ZIP (recommandé si tu es uniquement sur téléphone)
+1. Crée un dépôt GitHub vide et téléverse LOrdreCache_3D_Refonte_ANDROID_CI.zip à la racine du dépôt.
+2. Crée le fichier .github/workflows/build-from-zip.yml dans le dépôt.
+3. Copie dedans le contenu du fichier compagnon LOrdreCache_3D_GitHub_Build_From_Zip.yml fourni à côté du ZIP, puis valide le commit.
+4. Ouvre Actions et lance « L'Ordre Caché 3D — build Android from ZIP » (ou attends le déclenchement sur push).
+5. Dans l'exécution, télécharge l'artefact Android pour obtenir LOrdreCache-3D-debug.apk. L'artefact de validation contient les journaux et le rapport de tests.
 
-L'APK de débogage est destiné à une installation manuelle. Ce n'est pas une version signée pour Google Play. Le workflow n'a pas encore été exécuté dans ton compte GitHub : en cas d'échec, télécharge les journaux/rapports dans l'artefact et partage leur contenu pour corriger l'erreur exacte.
+L'APK est signé avec une clé de débogage pour installation manuelle. Ce n'est pas une version signée pour Google Play. Le workflow GitHub n'a pas été exécuté depuis cet environnement; si une étape échoue, télécharge les artefacts de journaux dans Actions et partage leur contenu pour diagnostiquer l'erreur exacte.

@@ -1,79 +1,70 @@
-# L'Ordre Caché — Godot 2D prototype
+# L'Ordre Caché — 3D Android vertical slice
 
-**Genre:** experimental puzzle adventure · **Engine:** Godot 4.4.1 · **Code:** GDScript · **Target:** Android portrait / desktop preview · **Languages:** French, English, Arabic (RTL layout)
+**Engine:** Godot 4.4.1 · **Code:** GDScript · **Target:** Android portrait · **Languages:** French, English and Arabic · **Connectivity:** offline
 
-> The world doesn't explain. It responds.
+> Le monde ne t'explique pas ses lois. Il répond à tes expériences.
 
-This repository contains a playable first chapter prototype, not a claim that a finished commercial release already exists. The core loop is implemented: choose a sign, observe a world-state transition, infer a law, record it in the notebook, then apply previously learned rules to a more complex puzzle.
+This is an upgraded, playable **3D prototype**, not a claim that a finished commercial game is complete. It replaces the previous single-image 2D scene with a procedural 3D garden, a real camera, lighting, physical objects, raycast selection, a separated HUD, save validation, original synthesized ambience and interaction sounds.
 
-## What is implemented
+## What's in this build
 
-- Six handcrafted experiments in the Still Garden chapter.
-- Four signs: Sun, Rain, Moon, Wind.
-- Persistent state transitions and feedback for experiments that do not change the world.
-- A notebook that records laws after the player observes them.
-- Optional hints, retry/reset, save/load through Godot's local `user://` config file.
-- Language switch: French / English / Arabic with right-to-left layout for Arabic.
-- Original vector-drawn atmosphere and a self-contained SVG launcher icon.
-- GitHub Actions validation, gameplay smoke tests, Android debug APK export, and downloadable logs/test reports.
+- A small 3D garden made from procedural meshes: trees, plants, a stone path, altar, four sign pedestals and a central object.
+- Touch or click the central object to inspect it. Tap a world-space sign pedestal to select Sun, Rain, Moon or Wind; the same signs are also available as mobile-friendly UI buttons.
+- Apply the selected sign and watch the 3D object's model change. A successful observation can record a law in the notebook.
+- Six experiments and seven possible laws from the first chapter remain in the project.
+- Optional hints, reset, progress, notebook, French/English/Arabic text, local save, ambient sound, discovery cue and no-change feedback.
+- Puzzle rules, world rendering, save handling and localization live in separate scripts; the main controller coordinates the HUD, session and touch events.
+- GitHub Actions parses/imports the project, runs the regression suite, uploads logs/test reports/source snapshot and exports an Android debug APK.
 
-## The six experiments
+## What it is not yet
 
-1. Wake the silent seed with sunlight.
-2. Grow the awakened sprout with rain.
-3. Open the grown plant with moonlight.
-4. Discover that wind can move a seed.
-5. Experiment with a cold stone: sunlight warms it, moonlight reveals a mark, wind parts it.
-6. Reconstruct the sequence to bloom a seed using the laws already observed.
+The environment and object models are procedural low-poly geometry. This gives the game true 3D interactions and provides a foundation for art direction, but it is **not yet comparable to a major-studio release**. It still needs bespoke environment/object art, more varied animation, sound design, narrative and puzzle content, device testing and a dedicated visual-polish pass before commercial release.
 
-No lives, timer, or failure penalty: experiments are the main mechanic. Incorrect attempts deliberately give a meaningful observation rather than a generic “wrong answer.”
+## Run in Godot
 
-## Run locally
+1. Install **Godot 4.4.1 Standard** (not .NET).
+2. Open `project.godot` and press **F6/F5**.
+3. For the automated regression tests, run:
 
-1. Install Godot **4.4.1 Standard** (not .NET).
-2. Open this folder's `project.godot` in Godot.
-3. Press **F6/F5** or click Run.
+   ```bash
+   godot --headless --editor --path . --quit
+   godot --headless --path . --script res://tests/smoke_test.gd
+   ```
 
-For gameplay smoke tests:
+## Build an Android APK with GitHub Actions
 
-```bash
-godot --headless --editor --path . --quit
-godot --headless --path . --script res://tests/smoke_test.gd
-```
+### Option A — upload the extracted project
 
-## Android build from GitHub Actions
+Upload the *contents* of this ZIP into the root of a GitHub repository, preserving `.github/workflows/build.yml`. Push to `main`, or open **Actions → Build L'Ordre Caché 3D Android → Run workflow**. The CI creates a debug APK and downloadable logs/reports.
 
-1. Create a GitHub repository and upload these files preserving their folder structure.
-2. Commit/push to `main`, or use **Actions → Build L'Ordre Caché → Run workflow**.
-3. Wait for the workflow to complete.
-4. Download the artifact named `lordre-cache-android-apk-<run number>` to get `LOrdreCache-debug.apk` and Android export logs. Download `lordre-cache-validation-<run number>` for import logs, smoke test logs and a source archive.
-5. On Android, allow installs from the browser/file app you use, then install the debug APK.
+### Option B — upload this ZIP as one file (phone-friendly)
 
-The workflow uses Godot export templates, the Android SDK and Java 17. The project explicitly enables ETC2/ASTC texture import because Godot Android export can otherwise fail on headless Linux with a blank “configuration errors” message. CI clears the generated `.godot` cache before reimporting source assets, and the Android preset uses PNG launcher-icon fields supported by Godot 4.4.1. It does **not** require Unity, Unity activation, any paid plugin, or a game service. The debug APK is for sideload testing, not Google Play release signing.
+1. Upload `LOrdreCache_3D_Refonte_ANDROID_CI.zip` to the root of a repository.
+2. Create `.github/workflows/build-from-zip.yml` in that repository using the companion workflow file `LOrdreCache_3D_GitHub_Build_From_Zip.yml` delivered alongside the ZIP.
+3. Run the workflow from the GitHub **Actions** tab.
 
-## Important limitations / next milestones
+With Option A, the Android artifact is named `lordre-cache-3d-android-apk-<run number>` and the validation artifact `lordre-cache-validation-<run number>`. With Option B, the matching names are `lordre-cache-zip-android-apk-<run number>` and `lordre-cache-zip-validation-<run number>`. The Android artifact contains `LOrdreCache-3D-debug.apk`, import/export logs and the APK SHA-256; validation artifacts contain import/test logs and a source snapshot.
 
-- This is an initial playable vertical slice, not yet the proposed 25–35 puzzle, 4–6 hour commercial game.
-- Illustrations are original vector shapes and symbols rendered by code; there is not yet frame-by-frame character animation, a licensed music score, professional voice acting, or a full set of bespoke background paintings.
-- Arabic strings are included and the UI direction is RTL, but a native-speaker QA pass and appropriate Arabic font asset should be added before public release.
-- No Google Play release keystore or store assets are included. Never commit a private keystore or password to the repository.
-- GitHub Actions has not run from this environment. The first hosted build is the final authority on APK export; its logs are uploaded even when a step fails.
+The APK uses debug signing for sideload testing; it is **not** signed for Google Play release. The workflow generates a temporary debug keystore on the runner, so Android may require uninstalling a previous test APK before installing one from a later CI run; uninstalling can erase local progress. The CI has not been run in your GitHub account from this environment, and the current environment did not have the Godot executable available to perform an actual local engine build. The uploaded GitHub Actions logs will be the first authoritative engine/export validation.
 
-## Repository layout
+## Code layout
 
 ```text
-.github/workflows/build.yml   CI validation + Android APK + artifacts
-assets/app_icon.svg           original launcher icon
-scenes/main.tscn              main scene
-scripts/main.gd               UI, puzzle state machine, saves, localisation
-tests/smoke_test.gd           gameplay regression smoke test
-export_presets.cfg            Android debug export preset
+.github/workflows/build.yml    CI validation + APK export
+scenes/main.tscn               Node3D entry scene
+scripts/main.gd                scene coordination, HUD and interaction events
+scripts/garden_world.gd        procedural 3D world, raycast targets, ambience
+scripts/puzzle_catalog.gd      puzzle data, transitions and valid puzzle states
+scripts/puzzle_engine.gd       renderer-independent state machine
+scripts/save_service.gd        versioned save/load and untrusted-data sanitization
+scripts/localization.gd        FR / EN / AR text
+assets/audio/                  original synthesized ambience and cues
+tests/smoke_test.gd            regression tests
+export_presets.cfg             Android debug export preset
+docs/ARCHITECTURE.md            runtime and data-flow overview
+docs/REVIEW_REPORT.md           implementation review findings and checks
 ```
 
-## Licence
+## Licence and release note
 
-Prototype source code is supplied for continued development. Replace the placeholder publisher details and establish a formal product/content licence before distribution. No third-party game assets are bundled.
-
-## Phone-friendly ZIP workflow
-
-If you prefer not to upload the extracted project tree, upload `LOrdreCache_Godot_Project_and_CI.zip` to the **root** of the GitHub repository, then create `.github/workflows/build-from-zip.yml` from the companion file `LOrdreCache_GitHub_Build_From_Zip.yml`. The workflow name in the Actions tab is **L'Ordre Caché — build Android from ZIP**. It validates the project, runs the smoke test, exports a debug APK, and uploads the APK plus logs as a single artifact.
+The code and original synthesized sound files are included in the archive. Before public/commercial release, select a formal licence and review all third-party dependencies/assets you add later. Never commit a private release keystore or signing passwords.
